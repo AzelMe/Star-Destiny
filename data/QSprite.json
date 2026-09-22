@@ -1,0 +1,216 @@
+{
+  "Nova": {
+    "name": "Nova",
+    "cols": 10,
+    "rows": 10,
+    "anchorX": 0.5,
+    "anchorY": 1,
+    "sampleImg": "G:\\rpg-maker-clean-projects-rmmv-fr\\img\\characters\\%Nova-.png",
+    "poses": {
+      "move2": {
+        "name": "move2",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "move4": {
+        "name": "move4",
+        "speed": 10,
+        "adjust": true,
+        "pattern": [
+          10,
+          11,
+          12,
+          13
+        ]
+      },
+      "move6": {
+        "name": "move6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          20,
+          21,
+          22,
+          23
+        ]
+      },
+      "move8": {
+        "name": "move8",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          30,
+          31,
+          32,
+          33
+        ]
+      },
+      "idle2": {
+        "name": "idle2",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          5
+        ]
+      },
+      "idle4": {
+        "name": "idle4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          35
+        ]
+      },
+      "idle6": {
+        "name": "idle6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          15
+        ]
+      },
+      "idle8": {
+        "name": "idle8",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          25
+        ]
+      }
+    }
+  },
+  "NovaValiente": {
+    "name": "NovaValiente",
+    "cols": 10,
+    "rows": 10,
+    "anchorX": 0.5,
+    "anchorY": 1,
+    "sampleImg": "G:\\rpg-maker-clean-projects-rmmv-fr\\img\\characters\\%NovaValiente-.png",
+    "poses": {
+      "move4": {
+        "name": "move4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          40,
+          41,
+          42,
+          43
+        ]
+      },
+      "move6": {
+        "name": "move6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          30,
+          31,
+          32,
+          33
+        ]
+      },
+      "dash4": {
+        "name": "dash4",
+        "speed": 8,
+        "adjust": false,
+        "pattern": [
+          45,
+          46,
+          47,
+          48
+        ]
+      },
+      "dash6": {
+        "name": "dash6",
+        "speed": 8,
+        "adjust": false,
+        "pattern": [
+          35,
+          36,
+          37,
+          38
+        ]
+      },
+      "idle4": {
+        "name": "idle4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          10,
+          11,
+          12,
+          13
+        ]
+      },
+      "idle6": {
+        "name": "idle6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "waitbasic6": {
+        "name": "waitbasic6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          5
+        ]
+      },
+      "waitbasic4": {
+        "name": "waitbasic4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          15
+        ]
+      },
+      "basic6": {
+        "name": "basic6",
+        "speed": 6,
+        "adjust": false,
+        "pattern": [
+          6,
+          7,
+          8
+        ]
+      },
+      "basic4": {
+        "name": "basic4",
+        "speed": 6,
+        "adjust": false,
+        "pattern": [
+          16,
+          17,
+          18
+        ]
+      },
+      "block4": {
+        "name": "block4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          61
+        ]
+      },
+      "block6": {
+        "name": "block6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          60
+        ]
+      }
+    }
+  }
+}

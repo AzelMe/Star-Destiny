@@ -1,0 +1,4 @@
+[
+null,
+{"id":1,"actions":[],"battlerHue":0,"battlerName":"","dropItems":[{"dataId":1,"denominator":1,"kind":0},{"dataId":1,"denominator":1,"kind":0},{"dataId":1,"denominator":1,"kind":0}],"exp":0,"traits":[{"code":22,"dataId":1,"value":1}],"gold":0,"name":"Dummy","note":"Note that we set the evasion rate to 100%\nThis is because in the plugin parameters\nwe're using evasion rate for the move\nresist state. We don't want this enemy\nto be able to be moved\n\n<AIType:none>\n<respawn:60>","params":[2000,0,1,1,1,1,1,1]}
+]
