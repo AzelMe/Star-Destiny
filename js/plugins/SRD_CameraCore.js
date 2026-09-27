@@ -449,11 +449,15 @@ Game_Map.prototype.shiftCameraPosition = function(x, y, dur) {
 };
 
 Game_Map.prototype.setDisplayPosInfo = function(x, y) {
+	const scale = $gameScreen._zoomScale || 1;
+	const screenTileXAdjusted = this.screenTileX() / scale;
+	const screenTileYAdjusted = this.screenTileY() / scale;
+
 	if (this.isLoopHorizontal()) {
 		this._newDisplayX = x.mod(this.width());
 		this._newParallaxX = x;
 	} else {
-		var endX = this.width() - this.screenTileX();
+		var endX = this.width() - screenTileXAdjusted;
 		this._newDisplayX = endX < 0 ? endX / 2 : x.clamp(0, endX);
 		this._newParallaxX = this._newDisplayX;
 	}
@@ -461,7 +465,7 @@ Game_Map.prototype.setDisplayPosInfo = function(x, y) {
 		this._newDisplayY = y.mod(this.height());
 		this._newParallaxY = y;
 	} else {
-		var endY = this.height() - this.screenTileY();
+		var endY = this.height() - screenTileYAdjusted;
 		this._newDisplayY = endY < 0 ? endY / 2 : y.clamp(0, endY);
 		this._newParallaxY = this._newDisplayY;
 	}

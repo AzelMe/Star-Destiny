@@ -624,9 +624,16 @@ Sprite_LayerGraphic.prototype.updatePosition = function() {
 	this.z = this.lValue().z || 0;
 	this.opacity = this.lValue().opacity || 0;
 	this.blendMode = this.lValue().blend || 0;
+	var margin = this.parent && this.parent._margin || 0;
+	var width = Graphics.width + margin * 2;
+	var height = Graphics.height + margin * 2;
+	if (this.x !== -margin || this.y !== -margin ||
+		this._width !== width || this._height !== height) {
+		this.move(-margin, -margin, width, height);
+	}
 	
-	this.origin.x = 0 + this.displayX() * Galv.LG.tileSize + this.lValue().currentx + this.xOffset();
-	this.origin.y = 0 + this.displayY() * Galv.LG.tileSize + this.lValue().currenty + this.yOffset();
+	this.origin.x = this.displayX() * Galv.LG.tileSize + this.lValue().currentx + this.xOffset() - margin;
+	this.origin.y = this.displayY() * Galv.LG.tileSize + this.lValue().currenty + this.yOffset() - margin;
 	this.lValue().currentx += this.lValue().xspeed;
 	this.lValue().currenty += this.lValue().yspeed;
 };

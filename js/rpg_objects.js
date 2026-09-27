@@ -5604,11 +5604,15 @@ Game_Map.prototype.setupBattleback = function() {
 };
 
 Game_Map.prototype.setDisplayPos = function(x, y) {
+    const scale = $gameScreen._zoomScale || 1;
+    const screenTileXAdjusted = this.screenTileX() / scale;
+    const screenTileYAdjusted = this.screenTileY() / scale;
+
     if (this.isLoopHorizontal()) {
         this._displayX = x.mod(this.width());
         this._parallaxX = x;
     } else {
-        var endX = this.width() - this.screenTileX();
+        var endX = this.width() - screenTileXAdjusted;
         this._displayX = endX < 0 ? endX / 2 : x.clamp(0, endX);
         this._parallaxX = this._displayX;
     }
@@ -5616,7 +5620,7 @@ Game_Map.prototype.setDisplayPos = function(x, y) {
         this._displayY = y.mod(this.height());
         this._parallaxY = y;
     } else {
-        var endY = this.height() - this.screenTileY();
+        var endY = this.height() - screenTileYAdjusted;
         this._displayY = endY < 0 ? endY / 2 : y.clamp(0, endY);
         this._parallaxY = this._displayY;
     }

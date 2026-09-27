@@ -67,7 +67,7 @@ SRD.DynamicCamera = SRD.DynamicCamera || {};
         var nextY = $gameMap._displayY +
                     (targetY - $gameMap._displayY) * _.cameraFollowPower;
 
-        $gameMap.setDisplayPos(nextX, nextY);
+        $gameMap.setDisplayPosStart(nextX, nextY, 0);
     };
 
     _.update = function() {
