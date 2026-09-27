@@ -67,6 +67,15 @@
     player.setDirectionFix(directionFixed);
   }
 
+  function playLockOnSound() {
+    AudioManager.playSe({
+      name: 'Lock-On',
+      volume: 95,
+      pitch: 110,
+      pan: 0
+    });
+  }
+
   var Alias_Game_Player_beforeSkill = Game_Player.prototype.beforeSkill;
   Game_Player.prototype.beforeSkill = function(skill) {
     Alias_Game_Player_beforeSkill.call(this, skill);
@@ -125,6 +134,7 @@
     if (target) {
       this._lockOnEventId = target.eventId();
       this._lockOnMapId = $gameMap.mapId();
+      playLockOnSound();
     }
   };
 
