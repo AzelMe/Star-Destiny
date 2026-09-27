@@ -153,32 +153,14 @@
     faceLockOnTarget(this, target);
   };
 
-  function makeLockOnMarker() {
-    var bitmap = new Bitmap(40, 40);
-    var context = bitmap._context;
-    context.strokeStyle = '#ffd54a';
-    context.lineWidth = 3;
-    context.beginPath();
-    context.arc(20, 20, 13, 0, Math.PI * 2);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(20, 1);
-    context.lineTo(20, 8);
-    context.moveTo(20, 32);
-    context.lineTo(20, 39);
-    context.moveTo(1, 20);
-    context.lineTo(8, 20);
-    context.moveTo(32, 20);
-    context.lineTo(39, 20);
-    context.stroke();
-    bitmap._setDirty();
-    return bitmap;
+  function makeLockOnSprite() {
+    return new Sprite(ImageManager.loadBitmap('img/actorhud/', 'Lock-On'));
   }
 
   var Alias_Spriteset_Map_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
   Spriteset_Map.prototype.createLowerLayer = function() {
     Alias_Spriteset_Map_createLowerLayer.call(this);
-    this._lockOnMarker = new Sprite(makeLockOnMarker());
+    this._lockOnMarker = makeLockOnSprite();
     this._lockOnMarker.anchor.x = 0.5;
     this._lockOnMarker.anchor.y = 0.5;
     this._lockOnMarker.z = 9;

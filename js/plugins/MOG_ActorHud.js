@@ -1107,13 +1107,11 @@ Actor_Hud.prototype.initialize = function(hud_id) {
     this._data_initial_ref = [0,true];
 	this._hud_id = hud_id;
 	this._hud_size = [-1,-1,-1,-1];
+	this._ahud_motion = "hidden";
+	this._ahud_velocity = 0;
     this.base_parameter_clear();
     this.load_img();
-	if (!$gameSystem._ahud_visible) {
-		$gameSystem._ahud_opacity = 0;
-		this.opacity = 0
-	};
-	this.opacity = $gameSystem._ahud_opacity;
+	this.opacity = 255;
 	this.update();
 };
 
@@ -1201,10 +1199,11 @@ Actor_Hud.prototype.refresh_bhud = function() {
 //==============================
 Actor_Hud.prototype.refresh_position = function() {
 	 this.set_hud_position();	 
-	 this.visible = true;     
+	 this.visible = false;
 	 this.create_sprites();
  	 this._layout.x = this._pos_x;
 	 this._layout.y = this._pos_y;
+	 this.x = this.hiddenHudX();
 	 if (this._face) {
      	 this._face.x = this._pos_x + Moghunter.ahud_face_pos_x;
  	     this._face.y = this._pos_y + Moghunter.ahud_face_pos_y;
@@ -1301,20 +1300,47 @@ Actor_Hud.prototype.needHide = function(start) {
 // * Update visible
 //==============================
 Actor_Hud.prototype.update_visible = function() {
-	 this.visible = true;
-     if (this.needHide(false)) {
-		 this.opacity -= 15;
-	 } else {		 	
-		if (this.needFade()) {
-			if (this.opacity > Moghunter.ahud_fade_limit) {
-				this.opacity -= 10;
-				if (this.opacity < Moghunter.ahud_fade_limit) {this.opacity = Moghunter.ahud_fade_limit};
-			 };
-		} else {
-				 this.opacity += 10;
-		};		
-	 };
-	 $gameSystem._ahud_opacity = this.opacity;
+	var shouldShow = !this.needHide(false);
+	this.opacity = 255;
+	if (shouldShow) {
+		if (this._ahud_motion === "hidden" || this._ahud_motion === "exiting") {
+			this._ahud_motion = "entering";
+			this._ahud_velocity = 0;
+		};
+		this.visible = true;
+		if (this._ahud_motion === "entering") {
+			this._ahud_velocity += (0 - this.x) * 0.40;
+			this._ahud_velocity *= 0.30;
+			this.x += this._ahud_velocity;
+			if (Math.abs(this.x) < 1 && Math.abs(this._ahud_velocity) < 1) {
+				this.x = 0;
+				this._ahud_velocity = 0;
+				this._ahud_motion = "shown";
+			};
+		};
+	} else {
+		if (this._ahud_motion === "entering" || this._ahud_motion === "shown") {
+			this._ahud_motion = "exiting";
+			this._ahud_velocity = 0;
+		};
+		if (this._ahud_motion === "exiting") {
+			var hiddenX = this.hiddenHudX();
+			var distance = this.x - hiddenX;
+			this.x -= Math.max(6, distance * 0.18);
+			if (this.x <= hiddenX) {
+				this.x = hiddenX;
+				this._ahud_motion = "hidden";
+				this.visible = false;
+			};
+		};
+	};
+};
+
+//==============================
+// * Hidden Hud X
+//==============================
+Actor_Hud.prototype.hiddenHudX = function() {
+	return -(this._pos_x + this._layout.bitmap.width + 1);
 };
 
 //==============================

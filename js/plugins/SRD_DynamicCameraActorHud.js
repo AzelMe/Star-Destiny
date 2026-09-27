@@ -15,8 +15,8 @@
  * @default 6
  *
  * @help
- * Requiere QABS_LockOn y las imágenes img/pictures/UpBar.png y
- * img/pictures/DownBar.png. Las barras solo aparecen mientras hay un enemigo
+ * Requiere QABS_LockOn y las imágenes img/actorhud/UpBar.png y
+ * img/actorhud/DownBar.png. Las barras solo aparecen mientras hay un enemigo
  * fijado. Su posición cambia según la distancia al objetivo.
  */
 
@@ -48,8 +48,8 @@
 
 	function createBars(scene) {
 		bars = {
-			up: new Sprite(ImageManager.loadPicture("UpBar")),
-			down: new Sprite(ImageManager.loadPicture("DownBar"))
+			up: new Sprite(ImageManager.loadBitmap("img/actorhud/", "UpBar")),
+			down: new Sprite(ImageManager.loadBitmap("img/actorhud/", "DownBar"))
 		};
 		bars.up.anchor.x = 0.5;
 		bars.down.anchor.x = 0.5;
