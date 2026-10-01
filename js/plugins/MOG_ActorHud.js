@@ -1107,8 +1107,9 @@ Actor_Hud.prototype.initialize = function(hud_id) {
     this._data_initial_ref = [0,true];
 	this._hud_id = hud_id;
 	this._hud_size = [-1,-1,-1,-1];
-	this._ahud_motion = "hidden";
+	this._ahud_motion = SceneManager.isPreviousScene(Scene_Menu) ? "shown" : "hidden";
 	this._ahud_velocity = 0;
+	if (this._ahud_motion === "shown") {this.x = 0};
     this.base_parameter_clear();
     this.load_img();
 	this.opacity = 255;
@@ -1203,7 +1204,7 @@ Actor_Hud.prototype.refresh_position = function() {
 	 this.create_sprites();
  	 this._layout.x = this._pos_x;
 	 this._layout.y = this._pos_y;
-	 this.x = this.hiddenHudX();
+	 this.x = this._ahud_motion === "shown" ? 0 : this.hiddenHudX();
 	 if (this._face) {
      	 this._face.x = this._pos_x + Moghunter.ahud_face_pos_x;
  	     this._face.y = this._pos_y + Moghunter.ahud_face_pos_y;
@@ -1473,7 +1474,7 @@ Actor_Hud.prototype.create_face = function() {
 	this._face_data = [0,0,false,false,false,-1];
 	if (String(Moghunter.ahud_face_shake) === "true") {this._face_data[2] = true}
 	if (String(Moghunter.ahud_face_animated) === "true") {this._face_data[4] = true}
-	this._battler._ahud_face_data = [0,0,0,0]
+	if (!this._battler._ahud_face_data) {this._battler._ahud_face_data = [0,0,0,0]}
 	this.addChild(this._face);
 };
 

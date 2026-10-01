@@ -91,7 +91,7 @@
     "rows": 10,
     "anchorX": 0.5,
     "anchorY": 1,
-    "sampleImg": "G:\\rpg-maker-clean-projects-rmmv-fr\\img\\characters\\%NovaValiente-.png",
+    "sampleImg": "G:\\AST-001\\img\\characters\\%NovaValiente-.png",
     "poses": {
       "move4": {
         "name": "move4",
@@ -195,16 +195,16 @@
           18
         ]
       },
-      "block4": {
-        "name": "block4",
+      "block6": {
+        "name": "block6",
         "speed": 10,
         "adjust": false,
         "pattern": [
           61
         ]
       },
-      "block6": {
-        "name": "block6",
+      "block4": {
+        "name": "block4",
         "speed": 10,
         "adjust": false,
         "pattern": [
