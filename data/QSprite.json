@@ -210,6 +210,46 @@
         "pattern": [
           60
         ]
+      },
+      "damage4": {
+        "name": "damage4",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          66
+        ]
+      },
+      "damage6": {
+        "name": "damage6",
+        "speed": 10,
+        "adjust": false,
+        "pattern": [
+          65
+        ]
+      },
+      "stun4": {
+        "name": "stun4",
+        "speed": 14,
+        "adjust": false,
+        "pattern": [
+          85,
+          85,
+          85,
+          86,
+          87
+        ]
+      },
+      "stun6": {
+        "name": "stun6",
+        "speed": 14,
+        "adjust": false,
+        "pattern": [
+          75,
+          75,
+          75,
+          76,
+          77
+        ]
       }
     }
   }

@@ -18,6 +18,14 @@
  * @type boolean
  * @default false
  *
+ * @param Stun Pose
+ * @type string
+ * @default stun
+ *
+ * @param Stun Sound
+ * @type string
+ * @default slash1
+ *
  * @param Parry Animation
  * @type animation
  * @default 0
@@ -33,11 +41,6 @@
  * @min 0
  * @max 1
  * @default 0.35
- *
- * @param Block Recoil Distance
- * @type number
- * @min 0
- * @default 8
  *
  * @param Block Resistance Cost
  * @type number
@@ -94,7 +97,6 @@
  * the attacker's resistance. Reaching zero resistance stuns that battler.
  *
  * The player CT meter displays resistance, not skill energy.
- * Block Recoil Distance controls the short knockback after a normal block.
  * After resistance reaches zero, recovery waits Resistance Recovery Delay seconds.
  * A hit releases the player's stun and multiplies their later recovery rate.
  * A skill note may include <resistanceDamage:X> to drain X resistance on hit.
@@ -104,6 +106,8 @@
  * <guardPose:POSE> and <parryAnimation:ID>.
  * Add <stationary> to an enemy note to disable chasing and user movement
  * while preserving its QABS attack AI.
+ * The CT HUD uses CTBroken_Layout.png and plays the configured Stun Sound
+ * when the player's resistance reaches zero.
  * Plugin command: ct_hud_visible true|false
  */
 
@@ -116,10 +120,11 @@
     guardSkillId: Number(params['Guard Skill ID'] || 0),
     guardPose: String(params['Guard Pose'] || 'guard'),
     guardPoseLocksMovement: String(params['Guard Pose Locks Movement'] || 'false') === 'true',
+    stunPose: String(params['Stun Pose'] || 'stun'),
+    stunSound: String(params['Stun Sound'] || 'slash1'),
     parryAnimation: Number(params['Parry Animation'] || 0),
     parryWindow: Number(params['Parry Window'] || 8),
     blockDamageRate: Number(params['Block Damage Rate'] || 0.35),
-    blockRecoilDistance: Number(params['Block Recoil Distance'] || 8),
     blockResistanceCost: Number(params['Block Resistance Cost'] || 20),
     parryResistanceDamage: Number(params['Parry Resistance Damage'] || 35),
     maxResistance: Number(params['Max Resistance'] || 100),
@@ -136,6 +141,39 @@
     return Math.max(0, Math.min(maxValue, value));
   }
 
+  function resolveQSpritePose(character, pose) {
+    if (!pose || typeof character.hasPose !== 'function') return '';
+    var direction = character.direction();
+    if (character.hasPose(pose + direction)) return pose + direction;
+    if (character.hasPose(pose)) return pose;
+    if (character.hasPose(pose + 4)) return pose + 4;
+    if (character.hasPose(pose + 6)) return pose + 6;
+    return '';
+  }
+
+  function syncParryStunPose(battler) {
+    if (!Imported.QSprite || !battler) return;
+    var character = QPlus.getCharacter(battler._charaId);
+    if (!character || typeof character.loopPose !== 'function') return;
+    if (battler._parryStunFrames <= 0) {
+      if (character._parryStunPoseActive) {
+        character._parryStunPoseActive = false;
+        character._parryStunPoseName = '';
+        character.clearPose();
+      }
+      return;
+    }
+    if (character._parryStunPoseActive) return;
+    if (character === $gamePlayer && character._parryGuardPose) character.endGuardPose();
+    var data = battler.isActor() ? battler.actor() : battler.enemy();
+    var pose = data && data.qmeta && data.qmeta.stunPose || settings.stunPose;
+    var poseName = resolveQSpritePose(character, pose);
+    if (!poseName) return;
+    character._parryStunPoseName = poseName;
+    character._parryStunPoseActive = true;
+    character.loopPose(poseName, true, false);
+  }
+
   function ensureResources(battler) {
     if (battler._parryResistance == null) battler._parryResistance = settings.maxResistance;
     if (battler._parryMaxResistance == null) battler._parryMaxResistance = settings.maxResistance;
@@ -145,9 +183,8 @@
     if (battler._parryRecovering == null) battler._parryRecovering = false;
     if (battler._parryRecoveryWait == null) battler._parryRecoveryWait = 0;
     if (battler._parryHitRecovery == null) battler._parryHitRecovery = false;
-    if (battler._parryBlocked == null) battler._parryBlocked = false;
-    if (battler._parryPerfect == null) battler._parryPerfect = false;
     if (battler._parryStunnedBeforeHit == null) battler._parryStunnedBeforeHit = false;
+    if (battler._parrySuppressDamagePose == null) battler._parrySuppressDamagePose = false;
   }
 
   var aliasGameBattlerInitMembers = Game_Battler.prototype.initMembers;
@@ -161,9 +198,8 @@
     this._parryRecovering = false;
     this._parryRecoveryWait = 0;
     this._parryHitRecovery = false;
-    this._parryBlocked = false;
-    this._parryPerfect = false;
     this._parryStunnedBeforeHit = false;
+    this._parrySuppressDamagePose = false;
   };
 
   Game_Battler.prototype.parryResistance = function() {
@@ -187,6 +223,7 @@
       this._parryRecoveryWait = settings.resistanceRecoveryDelay;
       this._parryHitRecovery = false;
       if (this.isEnemy()) this._parryRecovering = true;
+      syncParryStunPose(this);
     }
   };
 
@@ -212,6 +249,7 @@
       this._parryHitRecovery = false;
       this._parryStunFrames = 0;
     }
+    syncParryStunPose(this);
     aliasGameBattlerUpdateABS.call(this);
   };
 
@@ -232,9 +270,10 @@
     if (guarding && Input.isTriggered(settings.guardInput)) {
       battler._parryWindow = settings.parryWindow;
     }
-    if (guarding && !battler._parryGuarding) this.startGuardPose(guardSkill);
-    if (!guarding && (battler._parryGuarding || this._parryGuardPose)) this.endGuardPose();
+    var wasGuarding = battler._parryGuarding;
     battler._parryGuarding = guarding;
+    if (guarding && !wasGuarding) this.startGuardPose(guardSkill);
+    if (!guarding && (wasGuarding || this._parryGuardPose)) this.endGuardPose();
     if (!guarding) battler._parryWindow = 0;
   };
 
@@ -256,14 +295,8 @@
   Game_Player.prototype.startGuardPose = function(skill) {
     if (!Imported.QSprite || typeof this.loopPose !== 'function') return;
     var pose = skill.qmeta && skill.qmeta.guardPose || settings.guardPose;
-    if (!pose || typeof this.hasPose !== 'function') return;
-    var direction = this.direction();
-    var poseName = this.hasPose(pose + direction) ? pose + direction : pose;
-    if (poseName === pose && !this.hasPose(pose)) {
-      if (this.hasPose(pose + 4)) poseName = pose + 4;
-      else if (this.hasPose(pose + 6)) poseName = pose + 6;
-      else return;
-    }
+    var poseName = resolveQSpritePose(this, pose);
+    if (!poseName) return;
     this._parryGuardPose = poseName;
     this.loopPose(poseName, settings.guardPoseLocksMovement, false);
   };
@@ -274,14 +307,32 @@
     this._parryGuardPose = null;
   };
 
-  if (Game_Player.prototype.playPose) {
-    var aliasPlayerPlayPose = Game_Player.prototype.playPose;
-    Game_Player.prototype.playPose = function(pose) {
+  if (Game_CharacterBase.prototype.playPose) {
+    var aliasCharacterPlayPose = Game_CharacterBase.prototype.playPose;
+    Game_CharacterBase.prototype.playPose = function(pose) {
+      if (this._parryStunPoseActive && String(pose) !== this._parryStunPoseName) return;
       var battler = this.battler();
-      if (battler && battler._parryGuarding && /^(damage|hurt)([2468])?$/i.test(String(pose))) {
+      if (battler && battler._parryGuarding && this._parryGuardPose &&
+        String(pose) !== this._parryGuardPose) return;
+      if (battler && (battler._parryGuarding || battler._parrySuppressDamagePose) &&
+        /^(damage|hurt)([2468])?$/i.test(String(pose))) {
         return;
       }
-      return aliasPlayerPlayPose.apply(this, arguments);
+      return aliasCharacterPlayPose.apply(this, arguments);
+    };
+  }
+
+  if (Game_CharacterBase.prototype.updatePose) {
+    var aliasCharacterUpdatePose = Game_CharacterBase.prototype.updatePose;
+    Game_CharacterBase.prototype.updatePose = function(wasMoving) {
+      var battler = this.battler();
+      if (this === $gamePlayer && battler && battler._parryGuarding && this._parryGuardPose) {
+        if (!this._posePlaying || !this._posePlaying.loop || this._pose !== this._parryGuardPose) {
+          this.loopPose(this._parryGuardPose, settings.guardPoseLocksMovement, false);
+        }
+        return;
+      }
+      aliasCharacterUpdatePose.call(this, wasMoving);
     };
   }
 
@@ -294,12 +345,11 @@
     var resistanceDamage = item && item.meta ? Math.max(0, Number(item.meta.resistanceDamage) || 0) : 0;
     ensureResources(target);
     target._parryStunnedBeforeHit = target.isStunned();
-    target._parryBlocked = false;
-    target._parryPerfect = false;
+    target._parrySuppressDamagePose = this.isPhysical() && target._parryGuarding &&
+      !target.isStunned();
     if (this.isPhysical() && target._parryGuarding && !target.isStunned()) {
       if (target._parryWindow > 0 && attacker && attacker !== target) {
         target._parryWindow = 0;
-        target._parryPerfect = true;
         attacker.applyResistanceDamage(settings.parryResistanceDamage);
         var guardSkill = Game_Player.prototype.guardSkill.call($gamePlayer);
         var animationId = Number(guardSkill && guardSkill.qmeta && guardSkill.qmeta.parryAnimation) ||
@@ -310,7 +360,6 @@
         }
         return 0;
       }
-      target._parryBlocked = true;
       target.applyResistanceDamage(settings.blockResistanceCost);
       if (resistanceDamage > 0) target.applyResistanceDamage(resistanceDamage);
       return Math.round(value * settings.blockDamageRate);
@@ -322,35 +371,18 @@
   var aliasExecuteDamage = Game_Action.prototype.executeDamage;
   Game_Action.prototype.executeDamage = function(target, value) {
     var wasAlreadyStunned = target && target._parryStunnedBeforeHit;
-    var wasBlocked = target && target._parryBlocked;
-    var wasPerfectParry = target && target._parryPerfect;
+    var suppressDamagePose = target && target._parrySuppressDamagePose;
     if (target) {
       target._parryStunnedBeforeHit = false;
-      target._parryBlocked = false;
-      target._parryPerfect = false;
     }
     aliasExecuteDamage.call(this, target, value);
+    if (target && suppressDamagePose) target._parrySuppressDamagePose = false;
     if (target && target.isActor() && wasAlreadyStunned && target._parryStunFrames > 0 && value > 0) {
       target._parryStunFrames = 0;
       target._parryRecoveryWait = 0;
       target._parryHitRecovery = true;
+      syncParryStunPose(target);
     }
-    if (wasBlocked && !wasPerfectParry && value > 0 && target === $gamePlayer.battler()) {
-      applyBlockRecoil(this.subject());
-    }
-  };
-
-  function applyBlockRecoil(attackerBattler) {
-    if (!$gamePlayer.battler() || $gamePlayer.battler().isStunned()) return;
-    var attacker = attackerBattler && QPlus.getCharacter(attackerBattler._charaId);
-    if (!attacker || attacker === $gamePlayer || settings.blockRecoilDistance <= 0) return;
-    var dx = $gamePlayer.cx() - attacker.cx();
-    var dy = $gamePlayer.cy() - attacker.cy();
-    var length = Math.sqrt(dx * dx + dy * dy) || 1;
-    var x = $gamePlayer.px + dx / length * settings.blockRecoilDistance;
-    var y = $gamePlayer.py + dy / length * settings.blockRecoilDistance;
-    var position = $gamePlayer.adjustPosition(x, y);
-    $gamePlayer.pixelJump(position.x - $gamePlayer.px, position.y - $gamePlayer.py);
   }
 
   function isGuardingPlayerTarget(sequencer, target) {
@@ -433,11 +465,15 @@
   ParryCTHud.prototype.initialize = function() {
     Sprite.prototype.initialize.call(this);
     this._layoutImage = ImageManager.loadBitmap('img/chrono/', 'CT_Layout', 0, true);
+    this._brokenLayoutImage = ImageManager.loadBitmap('img/chrono/', 'CTBroken_Layout', 0, true);
     this._meterImage = ImageManager.loadBitmap('img/chrono/', 'CT_Meter', 0, true);
     this._numberImage = ImageManager.loadBitmap('img/chrono/', 'CT_Number', 0, true);
     this._motion = SceneManager.isPreviousScene(Scene_Menu) ? 'shown' : 'hidden';
     this._velocity = 0;
     this._ready = false;
+    this._stunBattler = null;
+    this._wasStunned = false;
+    this._stunShakeFrames = 0;
     this._fadeLimit = settings.smartFade ? 90 : 255;
     this.x = this._motion === 'shown' ? settings.hudX : this.hiddenX();
     this.y = settings.hudY;
@@ -455,17 +491,19 @@
   };
 
   ParryCTHud.prototype.createHudSprites = function() {
+    this._content = new Sprite();
+    this.addChild(this._content);
     this._layout = new Sprite(this._layoutImage);
-    this.addChild(this._layout);
+    this._content.addChild(this._layout);
     this._ctGauge = new Sprite(this._meterImage);
     this._ctGauge.x = 35;
     this._ctGauge.y = 25;
-    this.addChild(this._ctGauge);
+    this._content.addChild(this._ctGauge);
     this._numbers = [];
     for (var i = 0; i < 3; i++) {
       this._numbers[i] = new Sprite(this._numberImage);
       this._numbers[i].y = 3;
-      this.addChild(this._numbers[i]);
+      this._content.addChild(this._numbers[i]);
     }
     this._ready = true;
     this.refreshGauges();
@@ -475,7 +513,7 @@
     var battler = this.battler();
     if (!battler || !this._ready) return;
     ensureResources(battler);
-    var flow = this._meterImage.width / 3;
+    var flow = this._meterImage.width;
     var height = this._meterImage.height / 3;
     var rate = battler._parryResistance / battler._parryMaxResistance;
     var colorRow = rate <= 0.3 ? 1 : 0;
@@ -490,6 +528,37 @@
       var digit = Number(digits[i]);
       numberSprite.setFrame(digit * digitWidth, 0, digitWidth, this._numberImage.height);
       numberSprite.x = 155 - digitWidth * (digits.length - i);
+    }
+  };
+
+  ParryCTHud.prototype.updateStunState = function(battler) {
+    var stunned = battler._parryStunFrames > 0;
+    if (this._stunBattler !== battler) {
+      this._stunBattler = battler;
+      this._wasStunned = false;
+      this._stunShakeFrames = 0;
+      this._content.x = 0;
+      this._content.y = 0;
+    }
+    if (stunned !== this._wasStunned) {
+      this._layout.bitmap = stunned ? this._brokenLayoutImage : this._layoutImage;
+      if (stunned) {
+        this._stunShakeFrames = 18;
+        if (settings.stunSound) {
+          AudioManager.playSe({ name: settings.stunSound, volume: 90, pitch: 100, pan: 0 });
+        }
+      } else {
+        this._stunShakeFrames = 0;
+      }
+      this._wasStunned = stunned;
+    }
+    if (this._stunShakeFrames > 0) {
+      this._content.x = Math.random() * 10 - 5;
+      this._content.y = Math.random() * 6 - 3;
+      this._stunShakeFrames--;
+    } else {
+      this._content.x = 0;
+      this._content.y = 0;
     }
   };
 
@@ -542,7 +611,8 @@
     Sprite.prototype.update.call(this);
     if (!this.battler()) return;
     if (!this._ready) {
-      if (this._layoutImage.isReady() && this._meterImage.isReady() && this._numberImage.isReady()) {
+      if (this._layoutImage.isReady() && this._brokenLayoutImage.isReady() &&
+        this._meterImage.isReady() && this._numberImage.isReady()) {
         this.createHudSprites();
         this.x = this._motion === 'shown' ? settings.hudX : this.hiddenX();
       } else {
@@ -550,6 +620,7 @@
       }
     }
     this.refreshGauges();
+    this.updateStunState(this.battler());
     this.updateVisibility();
   };
 
