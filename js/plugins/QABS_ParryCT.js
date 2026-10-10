@@ -22,6 +22,10 @@
  * @type string
  * @default stun
  *
+ * @param Stun State ID
+ * @type state
+ * @default 17
+ *
  * @param Stun Sound
  * @type string
  * @default slash1
@@ -108,6 +112,8 @@
  * while preserving its QABS attack AI.
  * The CT HUD uses CTBroken_Layout.png and plays the configured Stun Sound
  * when the player's resistance reaches zero.
+ * Stun State ID is applied to actors and enemies for the full duration of
+ * their resistance stun, and removed when they recover.
  * Plugin command: ct_hud_visible true|false
  */
 
@@ -121,6 +127,7 @@
     guardPose: String(params['Guard Pose'] || 'guard'),
     guardPoseLocksMovement: String(params['Guard Pose Locks Movement'] || 'false') === 'true',
     stunPose: String(params['Stun Pose'] || 'stun'),
+    stunStateId: Number(params['Stun State ID'] || 0),
     stunSound: String(params['Stun Sound'] || 'slash1'),
     parryAnimation: Number(params['Parry Animation'] || 0),
     parryWindow: Number(params['Parry Window'] || 8),
@@ -187,6 +194,15 @@
     if (battler._parrySuppressDamagePose == null) battler._parrySuppressDamagePose = false;
   }
 
+  function syncParryStunState(battler) {
+    if (!settings.stunStateId || !$dataStates[settings.stunStateId]) return;
+    if (battler._parryStunFrames > 0) {
+      if (!battler.isStateAffected(settings.stunStateId)) battler.addState(settings.stunStateId);
+    } else if (battler.isStateAffected(settings.stunStateId)) {
+      battler.removeState(settings.stunStateId);
+    }
+  }
+
   var aliasGameBattlerInitMembers = Game_Battler.prototype.initMembers;
   Game_Battler.prototype.initMembers = function() {
     aliasGameBattlerInitMembers.call(this);
@@ -213,16 +229,20 @@
   };
 
   Game_Battler.prototype.applyResistanceDamage = function(amount) {
+
     ensureResources(this);
     if (this.isEnemy() && this._parryRecovering) return;
     this._parryResistance = clamp(this._parryResistance - amount, this._parryMaxResistance);
+    var previousResistance = this._parryResistance;
     if (this._parryResistance <= 0) {
+      $gameScreen.startShake(2, 3, 10);
       this._parryStunFrames = 1;
       this._parryGuarding = false;
       this._parryWindow = 0;
       this._parryRecoveryWait = settings.resistanceRecoveryDelay;
       this._parryHitRecovery = false;
       if (this.isEnemy()) this._parryRecovering = true;
+      syncParryStunState(this);
       syncParryStunPose(this);
     }
   };
@@ -251,6 +271,7 @@
     }
     syncParryStunPose(this);
     aliasGameBattlerUpdateABS.call(this);
+    syncParryStunState(this);
   };
 
   var aliasIsStunned = Game_Battler.prototype.isStunned;
@@ -290,6 +311,23 @@
       }
     }
     return null;
+  };
+
+  // Impedir ataques y habilidades mientras el jugador está bloqueando.
+  var aliasParryCanInputSkill = Game_CharacterBase.prototype.canInputSkill;
+  Game_CharacterBase.prototype.canInputSkill = function(fromEvent) {
+    if (this === $gamePlayer && this.battler()) {
+      var battler = this.battler();
+      var guardSkill = this.guardSkill();
+      var guardInputActive = Input.isPressed(settings.guardInput) &&
+        !!guardSkill && !battler.isStunned();
+
+      if (battler._parryGuarding || guardInputActive) {
+        return false;
+      }
+    }
+
+    return aliasParryCanInputSkill.call(this, fromEvent);
   };
 
   Game_Player.prototype.startGuardPose = function(skill) {
@@ -381,6 +419,7 @@
       target._parryStunFrames = 0;
       target._parryRecoveryWait = 0;
       target._parryHitRecovery = true;
+      syncParryStunState(target);
       syncParryStunPose(target);
     }
   }
@@ -467,7 +506,7 @@
     this._layoutImage = ImageManager.loadBitmap('img/chrono/', 'CT_Layout', 0, true);
     this._brokenLayoutImage = ImageManager.loadBitmap('img/chrono/', 'CTBroken_Layout', 0, true);
     this._meterImage = ImageManager.loadBitmap('img/chrono/', 'CT_Meter', 0, true);
-    this._numberImage = ImageManager.loadBitmap('img/chrono/', 'CT_Number', 0, true);
+    this._numberImage = ImageManager.loadBitmap('img/chrono/', 'CT_Number', 0, false);
     this._motion = SceneManager.isPreviousScene(Scene_Menu) ? 'shown' : 'hidden';
     this._velocity = 0;
     this._ready = false;
@@ -496,15 +535,11 @@
     this._layout = new Sprite(this._layoutImage);
     this._content.addChild(this._layout);
     this._ctGauge = new Sprite(this._meterImage);
-    this._ctGauge.x = 35;
-    this._ctGauge.y = 25;
+    this._ctGauge.x = 50;
+    this._ctGauge.y = 30;
     this._content.addChild(this._ctGauge);
     this._numbers = [];
-    for (var i = 0; i < 3; i++) {
-      this._numbers[i] = new Sprite(this._numberImage);
-      this._numbers[i].y = 3;
-      this._content.addChild(this._numbers[i]);
-    }
+  
     this._ready = true;
     this.refreshGauges();
   };
@@ -545,7 +580,7 @@
       if (stunned) {
         this._stunShakeFrames = 18;
         if (settings.stunSound) {
-          AudioManager.playSe({ name: settings.stunSound, volume: 90, pitch: 100, pan: 0 });
+          AudioManager.playSe({ name: settings.stunSound, volume: 30, pitch: 150, pan: 0 });
         }
       } else {
         this._stunShakeFrames = 0;
@@ -612,7 +647,7 @@
     if (!this.battler()) return;
     if (!this._ready) {
       if (this._layoutImage.isReady() && this._brokenLayoutImage.isReady() &&
-        this._meterImage.isReady() && this._numberImage.isReady()) {
+        this._meterImage.isReady() ) {
         this.createHudSprites();
         this.x = this._motion === 'shown' ? settings.hudX : this.hiddenX();
       } else {

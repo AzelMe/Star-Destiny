@@ -59,23 +59,44 @@
 		bars.down.y = Graphics.height;
 		bars.up.visible = false;
 		bars.down.visible = false;
-		scene.addChild(bars.up);
-		scene.addChild(bars.down);
+		var parent = scene._hudField || scene;
+		parent.addChild(bars.up);
+		parent.addChild(bars.down);
 		barsScene = scene;
 		barsActive = false;
+	}
+
+	function keepBarsBelowActorHud(scene) {
+		var parent = scene._hudField || scene;
+		if (bars.up.parent !== parent || bars.down.parent !== parent) {
+			if (bars.up.parent) bars.up.parent.removeChild(bars.up);
+			if (bars.down.parent) bars.down.parent.removeChild(bars.down);
+			parent.addChild(bars.up);
+			parent.addChild(bars.down);
+		}
+		if (parent !== scene._hudField || !scene._actorHud) return;
+
+		var upIndex = parent.getChildIndex(bars.up);
+		var downIndex = parent.getChildIndex(bars.down);
+		var actorHudIndex = parent.getChildIndex(scene._actorHud);
+		if (upIndex < downIndex && downIndex < actorHudIndex) return;
+
+		parent.removeChild(bars.up);
+		parent.removeChild(bars.down);
+		actorHudIndex = parent.getChildIndex(scene._actorHud);
+		parent.addChildAt(bars.up, actorHudIndex);
+		parent.addChildAt(bars.down, actorHudIndex + 1);
 	}
 
 	function addBarsToScene(scene) {
 		if (barsScene !== scene) {
 			if (bars && bars.up.parent) {
 				bars.up.parent.removeChild(bars.up);
-				bars.down.parent.removeChild(bars.down);
 			}
+			if (bars && bars.down.parent) bars.down.parent.removeChild(bars.down);
 			createBars(scene);
-		} else if (bars.up.parent !== scene) {
-			scene.addChild(bars.up);
-			scene.addChild(bars.down);
 		}
+		keepBarsBelowActorHud(scene);
 	}
 
 	function updateBars() {
