@@ -1107,13 +1107,12 @@ Actor_Hud.prototype.initialize = function(hud_id) {
     this._data_initial_ref = [0,true];
 	this._hud_id = hud_id;
 	this._hud_size = [-1,-1,-1,-1];
+	this._ahud_motion = SceneManager.isPreviousScene(Scene_Menu) ? "shown" : "hidden";
+	this._ahud_velocity = 0;
+	if (this._ahud_motion === "shown") {this.x = 0};
     this.base_parameter_clear();
     this.load_img();
-	if (!$gameSystem._ahud_visible) {
-		$gameSystem._ahud_opacity = 0;
-		this.opacity = 0
-	};
-	this.opacity = $gameSystem._ahud_opacity;
+	this.opacity = 255;
 	this.update();
 };
 
@@ -1201,10 +1200,11 @@ Actor_Hud.prototype.refresh_bhud = function() {
 //==============================
 Actor_Hud.prototype.refresh_position = function() {
 	 this.set_hud_position();	 
-	 this.visible = true;     
+	 this.visible = false;
 	 this.create_sprites();
  	 this._layout.x = this._pos_x;
 	 this._layout.y = this._pos_y;
+	 this.x = this._ahud_motion === "shown" ? 0 : this.hiddenHudX();
 	 if (this._face) {
      	 this._face.x = this._pos_x + Moghunter.ahud_face_pos_x;
  	     this._face.y = this._pos_y + Moghunter.ahud_face_pos_y;
@@ -1301,20 +1301,47 @@ Actor_Hud.prototype.needHide = function(start) {
 // * Update visible
 //==============================
 Actor_Hud.prototype.update_visible = function() {
-	 this.visible = true;
-     if (this.needHide(false)) {
-		 this.opacity -= 15;
-	 } else {		 	
-		if (this.needFade()) {
-			if (this.opacity > Moghunter.ahud_fade_limit) {
-				this.opacity -= 10;
-				if (this.opacity < Moghunter.ahud_fade_limit) {this.opacity = Moghunter.ahud_fade_limit};
-			 };
-		} else {
-				 this.opacity += 10;
-		};		
-	 };
-	 $gameSystem._ahud_opacity = this.opacity;
+	var shouldShow = !this.needHide(false);
+	this.opacity = 255;
+	if (shouldShow) {
+		if (this._ahud_motion === "hidden" || this._ahud_motion === "exiting") {
+			this._ahud_motion = "entering";
+			this._ahud_velocity = 0;
+		};
+		this.visible = true;
+		if (this._ahud_motion === "entering") {
+			this._ahud_velocity += (0 - this.x) * 0.40;
+			this._ahud_velocity *= 0.30;
+			this.x += this._ahud_velocity;
+			if (Math.abs(this.x) < 1 && Math.abs(this._ahud_velocity) < 1) {
+				this.x = 0;
+				this._ahud_velocity = 0;
+				this._ahud_motion = "shown";
+			};
+		};
+	} else {
+		if (this._ahud_motion === "entering" || this._ahud_motion === "shown") {
+			this._ahud_motion = "exiting";
+			this._ahud_velocity = 0;
+		};
+		if (this._ahud_motion === "exiting") {
+			var hiddenX = this.hiddenHudX();
+			var distance = this.x - hiddenX;
+			this.x -= Math.max(6, distance * 0.18);
+			if (this.x <= hiddenX) {
+				this.x = hiddenX;
+				this._ahud_motion = "hidden";
+				this.visible = false;
+			};
+		};
+	};
+};
+
+//==============================
+// * Hidden Hud X
+//==============================
+Actor_Hud.prototype.hiddenHudX = function() {
+	return -(this._pos_x + this._layout.bitmap.width + 1);
 };
 
 //==============================
@@ -1349,6 +1376,75 @@ Actor_Hud.prototype.update_dif = function(value,real_value,speed) {
 //==============================
 // * Refresh Meter
 //==============================
+function createHpMeterPathData(bitmap, row, rowHeight) {
+	var width = bitmap.width;
+	var pixelCount = width * rowHeight;
+	var source = bitmap._context.getImageData(0, row * rowHeight, width, rowHeight);
+	var distances = new Int32Array(pixelCount);
+	var queue = new Int32Array(pixelCount);
+	var start = -1;
+	for (var i = 0; i < pixelCount; i++) {
+		distances[i] = -1;
+		if (start < 0 && source.data[i * 4 + 3] > 0) {start = i};
+	};
+	if (start < 0) {return null};
+	var head = 0;
+	var tail = 0;
+	var maxDistance = 0;
+	distances[start] = 0;
+	queue[tail++] = start;
+	while (head < tail) {
+		var index = queue[head++];
+		var x = index % width;
+		var y = Math.floor(index / width);
+		var nextDistance = distances[index] + 1;
+		var neighbors = [x > 0 ? index - 1 : -1, x < width - 1 ? index + 1 : -1,
+			y > 0 ? index - width : -1, y < rowHeight - 1 ? index + width : -1];
+		for (var n = 0; n < 4; n++) {
+			var next = neighbors[n];
+			if (next < 0) {continue};
+			if (distances[next] < 0 && source.data[next * 4 + 3] > 0) {
+				distances[next] = nextDistance;
+				queue[tail++] = next;
+				if (nextDistance > maxDistance) {maxDistance = nextDistance};
+			};
+		};
+	};
+	return {
+		width: width,
+		height: rowHeight,
+		source: source.data,
+		distances: distances,
+		maxDistance: maxDistance
+	};
+};
+
+function refreshHpMeterAlongPath(sprite, value, valueMax, type, rowHeight) {
+	var path = sprite._hpMeterPathData;
+	if (!path) {
+		var rate = valueMax > 0 ? Math.max(0, Math.min(1, value / valueMax)) : 0;
+		sprite.setFrame(0, type * rowHeight, sprite.bitmap.width * rate, rowHeight);
+		return;
+	};
+	var rate = valueMax > 0 ? Math.max(0, Math.min(1, value / valueMax)) : 0;
+	var imageData = sprite.bitmap._context.createImageData(path.width, path.height);
+	var limit = path.maxDistance * rate;
+	for (var i = 0; i < path.distances.length; i++) {
+		var sourceIndex = i * 4;
+		if (rate > 0 && path.distances[i] >= 0 &&
+			(rate >= 1 || path.distances[i] <= limit)) {
+			imageData.data[sourceIndex] = path.source[sourceIndex];
+			imageData.data[sourceIndex + 1] = path.source[sourceIndex + 1];
+			imageData.data[sourceIndex + 2] = path.source[sourceIndex + 2];
+			imageData.data[sourceIndex + 3] = path.source[sourceIndex + 3];
+		};
+	};
+	var rowY = type * rowHeight;
+	sprite.bitmap._context.putImageData(imageData, 0, rowY);
+	sprite.bitmap._setDirty();
+	sprite.setFrame(0, rowY, path.width, rowHeight);
+};
+
 Actor_Hud.prototype.refresh_meter = function(sprite,value,value_max,type,div) {
 	var ch = sprite.bitmap.height / div;
     var meter_rate = sprite.bitmap.width * value / value_max;
@@ -1447,7 +1543,7 @@ Actor_Hud.prototype.create_face = function() {
 	this._face_data = [0,0,false,false,false,-1];
 	if (String(Moghunter.ahud_face_shake) === "true") {this._face_data[2] = true}
 	if (String(Moghunter.ahud_face_animated) === "true") {this._face_data[4] = true}
-	this._battler._ahud_face_data = [0,0,0,0]
+	if (!this._battler._ahud_face_data) {this._battler._ahud_face_data = [0,0,0,0]}
 	this.addChild(this._face);
 };
 
@@ -1550,12 +1646,16 @@ Actor_Hud.prototype.create_hp_meter = function() {
 	this._hp_meter_red.y = this._pos_y + Moghunter.ahud_hp_meter_pos_y;
 	this._hp_meter_red.rotation = Moghunter.ahud_hp_meter_rotation * Math.PI / 180;
 	this._hp_meter_red.setFrame(0,0,0,0);
+	this._hp_meter_red.bitmap = new Bitmap(this._hp_meter_img.width, this._hp_meter_img.height);
+	this._hp_meter_red._hpMeterPathData = createHpMeterPathData(this._hp_meter_img, 1, this._hp_meter_img.height / 2);
 	this.addChild(this._hp_meter_red);		
 	this._hp_meter_blue = new Sprite(this._hp_meter_img);
 	this._hp_meter_blue.x = this._hp_meter_red.x;
 	this._hp_meter_blue.y = this._hp_meter_red.y;
 	this._hp_meter_blue.rotation = this._hp_meter_red.rotation * Math.PI / 180;
 	this._hp_meter_blue.setFrame(0,0,0,0);
+	this._hp_meter_blue.bitmap = new Bitmap(this._hp_meter_img.width, this._hp_meter_img.height);
+	this._hp_meter_blue._hpMeterPathData = createHpMeterPathData(this._hp_meter_img, 0, this._hp_meter_img.height / 2);
 	this.addChild(this._hp_meter_blue);
 	this._hp_old_ani[0] = this._battler.hp - 1;
 	if (String(Moghunter.ahud_hp_meter_flow) === "true") {this._hp_flow[0] = true;
@@ -2014,12 +2114,12 @@ Actor_Hud.prototype.update_hp = function() {
    	    }
 		else {
 		   if (this.need_refresh_parameter(0)) {
-				this.refresh_meter(this._hp_meter_blue,this._battler.hp,this._battler.mhp,0,2,0);
+				refreshHpMeterAlongPath(this._hp_meter_blue,this._battler.hp,this._battler.mhp,0,this._hp_meter_img.height / 2);
 				this._hp_old = [this._battler.hp,this._battler.mhp];
 			};
 			var dif_meter = this.update_dif(this._hp_old_ani[0],this._battler.hp,160)
 			if (this._hp_old_ani[0] != dif_meter) {this._hp_old_ani[0] = dif_meter;
-			this.refresh_meter(this._hp_meter_red,this._hp_old_ani[0],this._battler.mhp,1,2,0);};		
+				refreshHpMeterAlongPath(this._hp_meter_red,this._hp_old_ani[0],this._battler.mhp,1,this._hp_meter_img.height / 2);};
 	    };
     };
 	if (this._hp_number) {

@@ -3370,12 +3370,12 @@ function Game_CharacterAgro() {
       var inputs = absKeys[key].input;
       for (var i = 0; i < inputs.length; i++) {
         var input = inputs[i];
-        if (Input.isTriggered(input) || Input.isPressed(input)) {
+        if (Input.isTriggered(input)) {
           Input.stopPropagation();
           this.useSkill(absKeys[key].skillId);
           break;
         }
-        if (input === 'mouse1' && (TouchInput.isTriggered() || TouchInput.isPressed()) && this.canClick()) {
+        if (input === 'mouse1' && TouchInput.isTriggered() && this.canClick()) {
           TouchInput.stopPropagation();
           this.useSkill(absKeys[key].skillId);
           break;
@@ -3469,7 +3469,7 @@ function Game_CharacterAgro() {
     var dy = Math.abs(this.cy() - y2 - h / 2);
     var distance = Math.sqrt(dx * dx + dy * dy);
     skill.isOk = distance <= skill.settings.range;
-    skill.collider.color = skill.isOk ? '#00ff00' : '#ff0000';
+    skill.collider.color = skill.isOk ? '#00ff00' : '#ef6f6f';
   };
 
   Game_Player.prototype.beforeSkill = function(skill) {
@@ -4117,6 +4117,8 @@ function Game_Loot() {
   var Alias_Sprite_Character_initMembers = Sprite_Character.prototype.initMembers;
   Sprite_Character.prototype.initMembers = function() {
     Alias_Sprite_Character_initMembers.call(this);
+    this._damageFlashDuration = 0;
+    this._damageQueueLength = 0;
     this.createStateSprite();
   };
 
@@ -4130,6 +4132,16 @@ function Game_Loot() {
     Alias_Sprite_Character_update.call(this);
     if (this._character) this.updateBattler();
     if (this._battler) this.updateDamagePopup();
+    this.updateDamageFlash();
+  };
+
+  Sprite_Character.prototype.updateDamageFlash = function() {
+    if (this._battler instanceof Game_Enemy && this._damageFlashDuration > 0) {
+      this.setBlendColor([255, 120, 120, 140]);
+      this._damageFlashDuration--;
+    } else {
+      this.setBlendColor([0, 0, 0, 0]);
+    }
   };
 
   Sprite_Character.prototype.updateDamagePopup = function() {
@@ -4148,6 +4160,12 @@ function Game_Loot() {
   };
 
   Sprite_Character.prototype.setupDamagePopup = function() {
+    var damageQueueLength = this._battler._damageQueue.length;
+    if (this._battler instanceof Game_Enemy &&
+        damageQueueLength > this._damageQueueLength) {
+      this._damageFlashDuration = 8;
+    }
+    this._damageQueueLength = damageQueueLength;
     if (!Imported.QPopup || this._character._noPopup) return;
     if (this._battler._damageQueue.length > 0) {
       var string;
